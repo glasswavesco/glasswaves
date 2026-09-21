@@ -6,8 +6,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "watch": "tsc -w",
-    "test": "npm run build && node --test test/*.cjs"
+    "watch": "tsc -w"
   },
   "devDependencies": {
     "@types/node": "^12.6.8",

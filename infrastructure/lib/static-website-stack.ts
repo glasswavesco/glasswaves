@@ -1,10 +1,9 @@
-import { App, Aws, CfnCondition, CfnParameter, CfnRule, Fn, Stack, StackProps } from 'aws-cdk-lib';
+import { App, Duration, Stack, StackProps } from 'aws-cdk-lib';
 import { aws_s3 as s3 } from 'aws-cdk-lib';
 import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
 import { ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
 import { OriginProtocolPolicy, ViewerCertificate, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
-import { ARecord, CfnRecordSet, HostedZone, RecordTarget } from 'aws-cdk-lib/aws-route53';
-import { CloudFrontTarget } from 'aws-cdk-lib/aws-route53-targets';
+import { ARecord, CnameRecord, HostedZone, RecordTarget } from 'aws-cdk-lib/aws-route53';
 
 interface StaticWebsiteStackProps extends StackProps {
   domain: string; // e.g. glasswaves.co
@@ -34,68 +33,22 @@ export class StaticWebsiteStack extends Stack {
       props.domain
     )
 
-    const subdomainRecord = new ARecord(this, 'SubdomainRecordSet', {
+    new CnameRecord(this, 'SubdomainRecordSet', {
       zone: props.hostedZone,
       recordName: `${props.subdomain}.${props.domain}.`,
-      target: RecordTarget.fromAlias(
-        new CloudFrontTarget(this.subdomainDistribution)
-      )
+      domainName: 'cname.vercel-dns.com',
+      ttl: Duration.minutes(5)
     })
-
-    const hostingProvider = new CfnParameter(this, 'HostingProvider', {
-      type: 'String', default: 'cloudfront', allowedValues: ['cloudfront', 'vercel'],
-      description: 'DNS destination. Keep cloudfront until Vercel domains and redirects are configured.'
-    })
-    const vercelApexIp = new CfnParameter(this, 'VercelApexIp', {
-      type: 'String', default: '',
-      allowedPattern: '^$|^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$',
-      description: 'Exact IPv4 address from the Vercel apex domain settings.'
-    })
-    const vercelWwwCname = new CfnParameter(this, 'VercelWwwCname', {
-      type: 'String', default: '',
-      allowedPattern: '^$|^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+\\.?$',
-      description: 'Exact CNAME hostname from the Vercel www domain settings (no scheme or path).'
-    })
-    const useVercel = new CfnCondition(this, 'UseVercel', {
-      expression: Fn.conditionEquals(hostingProvider.valueAsString, 'vercel')
-    })
-    new CfnRule(this, 'RequireVercelTargets', {
-      ruleCondition: Fn.conditionEquals(hostingProvider.valueAsString, 'vercel'),
-      assertions: [vercelApexIp, vercelWwwCname].map(parameter => ({
-        assert: Fn.conditionNot(Fn.conditionEquals(parameter.valueAsString, '')),
-        assertDescription: `${parameter.logicalId} must be supplied when HostingProvider is vercel.`
-      }))
-    })
-
-    // Keep construct paths/logical IDs stable: update existing DNS records in place.
-    // Hosting resources and cross-stack exports remain available for rollback.
-    const configureVercelRecord = (record: ARecord, type: string, value: string) => {
-      const resource = record.node.defaultChild as CfnRecordSet
-      resource.addPropertyOverride('Type', Fn.conditionIf(useVercel.logicalId, type, 'A'))
-      const alias = resource.aliasTarget as CfnRecordSet.AliasTargetProperty
-      resource.addPropertyOverride('AliasTarget', Fn.conditionIf(
-        useVercel.logicalId, Aws.NO_VALUE, {
-          DNSName: alias.dnsName, HostedZoneId: alias.hostedZoneId
-        }
-      ))
-      resource.addPropertyOverride('TTL', Fn.conditionIf(useVercel.logicalId, '300', Aws.NO_VALUE))
-      resource.addPropertyOverride('ResourceRecords', Fn.conditionIf(
-        useVercel.logicalId, [value], Aws.NO_VALUE
-      ))
-    }
-    configureVercelRecord(subdomainRecord, 'CNAME', vercelWwwCname.valueAsString)
 
     if (props.redirectFromRoot && props.domainCertificate) {
       const rootBucket = this.createRootBucket(props.subdomain, props.domain, props.logBucket)
-      const rootDist = this.createRootCloudFrontDist(rootBucket, props.domain, props.logBucket, props.domainCertificate)
-      const rootRecord = new ARecord(this, "RootRecordSet", {
+      this.createRootCloudFrontDist(rootBucket, props.domain, props.logBucket, props.domainCertificate)
+      new ARecord(this, "RootRecordSet", {
         zone: props.hostedZone,
         recordName: `${props.domain}.`,
-        target: RecordTarget.fromAlias(
-          new CloudFrontTarget(rootDist)
-        )
+        target: RecordTarget.fromIpAddresses('76.76.21.21'),
+        ttl: Duration.minutes(5)
       })
-      configureVercelRecord(rootRecord, 'A', vercelApexIp.valueAsString)
     }
   }
 
