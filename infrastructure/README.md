@@ -45,3 +45,34 @@ npm install --save @aws-cdk/aws-route53-targets@1.1.0
 
 ### Emit CloudFormation Template
 `npx cdk synth`
+
+## Vercel cutover
+
+The website DNS records point to Vercel's assigned targets: apex A `216.150.1.1`
+and www CNAME `52acc4c59db427de.vercel-dns-016.com`. Before deploying, add both domains to
+Vercel project `glasswaves-dot-co-www`, assign www to Production, and configure
+`glasswaves.co` to permanently redirect to `https://www.glasswaves.co`.
+Compare these targets with Vercel's domain settings; if it recommends different
+project-specific values, update the two literals in `static-website-stack.ts`
+before deployment. Check the new site's content and `/index.html` compatibility.
+
+From this directory, after approval to cut over:
+
+```sh
+aws sso login --profile glasswaves-legacy
+aws sts get-caller-identity --profile glasswaves-legacy # account 081732485147
+npm ci
+npm run build
+npx aws-cdk@2.59.0 diff glasswaves-co-www --exclusively --profile glasswaves-legacy --no-change-set
+npx aws-cdk@2.59.0 deploy glasswaves-co-www --exclusively --profile glasswaves-legacy
+```
+
+Expect only the two DNS records to change. Do not deploy all stacks. After the
+stack completes, verify Vercel domain/certificate readiness, HTTPS on www, the
+apex redirect (including paths and queries), and important old URLs. A brief
+outage during DNS/TLS transition is acceptable. Merging alone does not deploy.
+
+Rollback: revert the cutover commit (or squash merge), rebuild, and run the same
+CDK deployment. Allow for the five-minute DNS TTL. The existing AWS hosting stays
+in place so reverting restores its DNS targets. Hosting cleanup is separate;
+the hosted zone and email records remain unchanged.

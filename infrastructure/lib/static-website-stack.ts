@@ -1,10 +1,9 @@
-import { App, Stack, StackProps } from 'aws-cdk-lib';
+import { App, Duration, Stack, StackProps } from 'aws-cdk-lib';
 import { aws_s3 as s3 } from 'aws-cdk-lib';
 import { aws_cloudfront as cloudfront } from 'aws-cdk-lib';
 import { ICertificate } from 'aws-cdk-lib/aws-certificatemanager';
 import { OriginProtocolPolicy, ViewerCertificate, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
-import { ARecord, HostedZone, RecordTarget } from 'aws-cdk-lib/aws-route53';
-import { CloudFrontTarget } from 'aws-cdk-lib/aws-route53-targets';
+import { ARecord, CnameRecord, HostedZone, RecordTarget } from 'aws-cdk-lib/aws-route53';
 
 interface StaticWebsiteStackProps extends StackProps {
   domain: string; // e.g. glasswaves.co
@@ -34,23 +33,21 @@ export class StaticWebsiteStack extends Stack {
       props.domain
     )
 
-    new ARecord(this, 'SubdomainRecordSet', {
+    new CnameRecord(this, 'SubdomainRecordSet', {
       zone: props.hostedZone,
       recordName: `${props.subdomain}.${props.domain}.`,
-      target: RecordTarget.fromAlias(
-        new CloudFrontTarget(this.subdomainDistribution)
-      )
+      domainName: '52acc4c59db427de.vercel-dns-016.com',
+      ttl: Duration.minutes(5)
     })
 
     if (props.redirectFromRoot && props.domainCertificate) {
       const rootBucket = this.createRootBucket(props.subdomain, props.domain, props.logBucket)
-      const rootDist = this.createRootCloudFrontDist(rootBucket, props.domain, props.logBucket, props.domainCertificate)
+      this.createRootCloudFrontDist(rootBucket, props.domain, props.logBucket, props.domainCertificate)
       new ARecord(this, "RootRecordSet", {
         zone: props.hostedZone,
         recordName: `${props.domain}.`,
-        target: RecordTarget.fromAlias(
-          new CloudFrontTarget(rootDist)
-        )
+        target: RecordTarget.fromIpAddresses('216.150.1.1'),
+        ttl: Duration.minutes(5)
       })
     }
   }
