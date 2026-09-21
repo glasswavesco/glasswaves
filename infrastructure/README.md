@@ -48,8 +48,8 @@ npm install --save @aws-cdk/aws-route53-targets@1.1.0
 
 ## Vercel cutover
 
-The website DNS records point to Vercel's shared targets: apex A `76.76.21.21`
-and www CNAME `cname.vercel-dns.com`. Before deploying, add both domains to
+The website DNS records point to Vercel's assigned targets: apex A `216.150.1.1`
+and www CNAME `52acc4c59db427de.vercel-dns-016.com`. Before deploying, add both domains to
 Vercel project `glasswaves-dot-co-www`, assign www to Production, and configure
 `glasswaves.co` to permanently redirect to `https://www.glasswaves.co`.
 Compare these targets with Vercel's domain settings; if it recommends different

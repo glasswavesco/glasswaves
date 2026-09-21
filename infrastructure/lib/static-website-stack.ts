@@ -36,7 +36,7 @@ export class StaticWebsiteStack extends Stack {
     new CnameRecord(this, 'SubdomainRecordSet', {
       zone: props.hostedZone,
       recordName: `${props.subdomain}.${props.domain}.`,
-      domainName: 'cname.vercel-dns.com',
+      domainName: '52acc4c59db427de.vercel-dns-016.com',
       ttl: Duration.minutes(5)
     })
 
@@ -46,7 +46,7 @@ export class StaticWebsiteStack extends Stack {
       new ARecord(this, "RootRecordSet", {
         zone: props.hostedZone,
         recordName: `${props.domain}.`,
-        target: RecordTarget.fromIpAddresses('76.76.21.21'),
+        target: RecordTarget.fromIpAddresses('216.150.1.1'),
         ttl: Duration.minutes(5)
       })
     }
